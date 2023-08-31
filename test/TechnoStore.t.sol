@@ -12,17 +12,19 @@ contract TechnoStoreTest is Test {
         );
     Token public token;
     TechnoStore public store;
-    address public owner = address(1);
+    address public owner;
     address public customer;
-    uint256 constant _CUSTOMER_PRIVATE_KEY = 123456;
+    uint256 constant _OWNER_PRIVATE_KEY = 123;
+    uint256 constant _CUSTOMER_PRIVATE_KEY = 456;
 
     function setUp() public {
+        owner = vm.addr(_OWNER_PRIVATE_KEY);
+        customer = vm.addr(_CUSTOMER_PRIVATE_KEY);
+
         vm.startPrank(owner);
         token = new Token();
         store = new TechnoStore(address(token));
         vm.stopPrank();
-
-        customer = vm.addr(_CUSTOMER_PRIVATE_KEY);
 
         assertEq(address(store.token()), address(token));
         assertEq(token.balanceOf(owner), 10000);
@@ -87,6 +89,7 @@ contract TechnoStoreTest is Test {
         uint i = 0;
         uint amount = price;
         uint deadline = block.timestamp + 1 days;
+        uint blockNumber = block.number;
 
         bytes32 hash = _getPermitHash(
             address(customer),
@@ -104,8 +107,90 @@ contract TechnoStoreTest is Test {
         assertEq(store.getQuantityOf(product), quantity - 1);
         assertEq((store.getBuyersOf(product)).length, 1);
         assertEq((store.getBuyersOf(product))[0], customer);
+        assertEq(store.boughtAt(product, customer), blockNumber);
         assertEq(token.balanceOf(customer), initBalance - amount);
         assertEq(token.balanceOf(address(store)), amount);
+    }
+
+    function testBuyProductRevertWithInsufficientAmount() public {
+        string memory product = "Keyboard";
+        uint price = 50;
+
+        vm.startPrank(owner);
+
+        token.transfer(customer, 1000);
+        store.addProduct(product, 1, price);
+
+        vm.stopPrank();
+
+        uint i = 0;
+        uint deadline = block.timestamp + 1 days;
+
+        bytes32 hash = _getPermitHash(
+            address(owner),
+            address(store),
+            price,
+            token.nonces(owner),
+            deadline
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_OWNER_PRIVATE_KEY, hash);
+
+        vm.prank(owner);
+        store.buyProduct(i, price, deadline, v, r, s);
+
+        hash = _getPermitHash(
+            address(customer),
+            address(store),
+            price,
+            token.nonces(customer),
+            deadline
+        );
+        (v, r, s) = vm.sign(_CUSTOMER_PRIVATE_KEY, hash);
+
+        vm.prank(customer);
+        vm.expectRevert("Library__InsufficientAmount");
+        store.buyProduct(i, price, deadline, v, r, s);
+    }
+
+    function testBuyProductRevertWithProductAlreadyBought() public {
+        string memory product = "Keyboard";
+        uint quantity = 10;
+        uint price = 50;
+
+        vm.startPrank(owner);
+
+        token.transfer(customer, 1000);
+        store.addProduct(product, quantity, price);
+
+        vm.stopPrank();
+
+        uint i = 0;
+        uint deadline = block.timestamp + 1 days;
+
+        bytes32 hash = _getPermitHash(
+            address(customer),
+            address(store),
+            price,
+            token.nonces(customer),
+            deadline
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_CUSTOMER_PRIVATE_KEY, hash);
+
+        vm.prank(customer);
+        store.buyProduct(i, price, deadline, v, r, s);
+
+        hash = _getPermitHash(
+            address(customer),
+            address(store),
+            price,
+            token.nonces(customer),
+            deadline
+        );
+        (v, r, s) = vm.sign(_CUSTOMER_PRIVATE_KEY, hash);
+
+        vm.prank(customer);
+        vm.expectRevert("Library__ProductAlreadyBought");
+        store.buyProduct(i, price, deadline, v, r, s);
     }
 
     function _getPermitHash(
