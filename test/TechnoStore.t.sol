@@ -193,6 +193,53 @@ contract TechnoStoreTest is Test {
         store.buyProduct(i, price, deadline, v, r, s);
     }
 
+    function testRefundProduct() public {
+        string memory product = "Keyboard";
+        uint quantity = 10;
+        uint price = 50;
+
+        vm.startPrank(owner);
+
+        token.transfer(customer, 1000);
+        store.addProduct(product, quantity, price);
+
+        vm.stopPrank();
+
+        uint initBalance = token.balanceOf(customer);
+
+        console2.logUint(token.balanceOf(owner));
+        console2.logUint(token.balanceOf(customer));
+
+        uint i = 0;
+        uint amount = price;
+        uint deadline = block.timestamp + 1 days;
+
+        bytes32 hash = _getPermitHash(
+            address(customer),
+            address(store),
+            amount,
+            token.nonces(customer),
+            deadline
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_CUSTOMER_PRIVATE_KEY, hash);
+
+        vm.startPrank(customer);
+        store.buyProduct(i, amount, deadline, v, r, s);
+
+        store.refundProduct(i);
+
+        uint refundedAmount = (amount * 4) / 5;
+
+        assertEq(store.getQuantityOf(product), quantity);
+        assertEq((store.getBuyersOf(product)).length, 1);
+        assertEq((store.getBuyersOf(product))[0], customer);
+        assertEq(
+            token.balanceOf(customer),
+            initBalance - amount + refundedAmount
+        );
+        assertEq(token.balanceOf(address(store)), amount - refundedAmount);
+    }
+
     function _getPermitHash(
         address _owner,
         address _spender,
