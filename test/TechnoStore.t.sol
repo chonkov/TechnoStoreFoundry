@@ -240,6 +240,63 @@ contract TechnoStoreTest is Test {
         assertEq(token.balanceOf(address(store)), amount - refundedAmount);
     }
 
+    function testRefundProductRevertWithProductNotBought() public {
+        string memory product = "Keyboard";
+        uint quantity = 10;
+        uint price = 50;
+
+        vm.startPrank(owner);
+
+        token.transfer(customer, 1000);
+        store.addProduct(product, quantity, price);
+
+        vm.stopPrank();
+
+        vm.startPrank(customer);
+        vm.expectRevert("Library__ProductNotBought");
+
+        store.refundProduct(0);
+    }
+
+    function testRefundProductRevertWithRefundExpired() public {
+        string memory product = "Keyboard";
+        uint quantity = 10;
+        uint price = 50;
+
+        vm.startPrank(owner);
+
+        token.transfer(customer, 1000);
+        store.addProduct(product, quantity, price);
+
+        vm.stopPrank();
+
+        uint i = 0;
+        uint amount = price;
+        uint deadline = block.timestamp + 1 days;
+        uint blockNumber = block.number;
+
+        bytes32 hash = _getPermitHash(
+            address(customer),
+            address(store),
+            amount,
+            token.nonces(customer),
+            deadline
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_CUSTOMER_PRIVATE_KEY, hash);
+
+        console2.logUint(blockNumber);
+
+        vm.startPrank(customer);
+        store.buyProduct(i, amount, deadline, v, r, s);
+
+        console2.logUint(block.number);
+
+        vm.roll(blockNumber + 101);
+        console2.logUint(block.number);
+        vm.expectRevert("Library__RefundExpired");
+        store.refundProduct(i);
+    }
+
     function _getPermitHash(
         address _owner,
         address _spender,
