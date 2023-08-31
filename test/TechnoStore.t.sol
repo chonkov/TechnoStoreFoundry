@@ -6,11 +6,15 @@ import {Token} from "../src/ERC20.sol";
 import {TechnoStore} from "../src/TechnoStore.sol";
 
 contract TechnoStoreTest is Test {
+    bytes32 private constant _PERMIT_TYPEHASH =
+        keccak256(
+            "Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+        );
     Token public token;
     TechnoStore public store;
     address public owner = address(1);
     address public customer;
-    uint256 public customerPrivateKey = 123456;
+    uint256 constant _CUSTOMER_PRIVATE_KEY = 123456;
 
     function setUp() public {
         vm.startPrank(owner);
@@ -18,7 +22,7 @@ contract TechnoStoreTest is Test {
         store = new TechnoStore(address(token));
         vm.stopPrank();
 
-        customer = vm.addr(customerPrivateKey);
+        customer = vm.addr(_CUSTOMER_PRIVATE_KEY);
 
         assertEq(address(store.token()), address(token));
         assertEq(token.balanceOf(owner), 10000);
@@ -61,6 +65,73 @@ contract TechnoStoreTest is Test {
         store.addProduct(product, 0, 0);
 
         vm.stopPrank();
+    }
+
+    function testBuyProduct() public {
+        string memory product = "Keyboard";
+        uint quantity = 10;
+        uint price = 50;
+
+        vm.startPrank(owner);
+
+        token.transfer(customer, 1000);
+        store.addProduct(product, quantity, price);
+
+        vm.stopPrank();
+
+        uint initBalance = token.balanceOf(customer);
+
+        console2.logUint(token.balanceOf(owner));
+        console2.logUint(token.balanceOf(customer));
+
+        uint i = 0;
+        uint amount = price;
+        uint deadline = block.timestamp + 1 days;
+
+        bytes32 hash = _getPermitHash(
+            address(customer),
+            address(store),
+            amount,
+            token.nonces(customer),
+            deadline
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_CUSTOMER_PRIVATE_KEY, hash);
+
+        vm.prank(customer);
+
+        store.buyProduct(i, amount, deadline, v, r, s);
+
+        assertEq(store.getQuantityOf(product), quantity - 1);
+        assertEq((store.getBuyersOf(product)).length, 1);
+        assertEq((store.getBuyersOf(product))[0], customer);
+        assertEq(token.balanceOf(customer), initBalance - amount);
+        assertEq(token.balanceOf(address(store)), amount);
+    }
+
+    function _getPermitHash(
+        address _owner,
+        address _spender,
+        uint256 _value,
+        uint256 _nonce,
+        uint256 _deadline
+    ) private view returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    token.DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            _PERMIT_TYPEHASH,
+                            _owner,
+                            _spender,
+                            _value,
+                            _nonce,
+                            _deadline
+                        )
+                    )
+                )
+            );
     }
 
     // function testGetters() public {
