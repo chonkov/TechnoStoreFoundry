@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import {Test, console2} from "forge-std/Test.sol";
 import {Token} from "../src/ERC20.sol";
-import {TechnoStore} from "../src/TechnoStore.sol";
+import {TechnoStore, Library} from "../src/TechnoStore.sol";
 
 contract TechnoStoreTest is Test {
     bytes32 private constant _PERMIT_TYPEHASH =
@@ -57,13 +57,13 @@ contract TechnoStoreTest is Test {
 
         vm.startPrank(owner);
 
-        vm.expectRevert("Library__InvalidInputs");
+        vm.expectRevert(Library.Library__InvalidInputs.selector);
         store.addProduct(product, quantity, 0);
 
-        vm.expectRevert("Library__InvalidInputs");
+        vm.expectRevert(Library.Library__InvalidInputs.selector);
         store.addProduct(product, 0, price);
 
-        vm.expectRevert("Library__InvalidInputs");
+        vm.expectRevert(Library.Library__InvalidInputs.selector);
         store.addProduct(product, 0, 0);
 
         vm.stopPrank();
@@ -148,7 +148,7 @@ contract TechnoStoreTest is Test {
         (v, r, s) = vm.sign(_CUSTOMER_PRIVATE_KEY, hash);
 
         vm.prank(customer);
-        vm.expectRevert("Library__InsufficientAmount");
+        vm.expectRevert(Library.Library__InsufficientAmount.selector);
         store.buyProduct(i, price, deadline, v, r, s);
     }
 
@@ -189,7 +189,7 @@ contract TechnoStoreTest is Test {
         (v, r, s) = vm.sign(_CUSTOMER_PRIVATE_KEY, hash);
 
         vm.prank(customer);
-        vm.expectRevert("Library__ProductAlreadyBought");
+        vm.expectRevert(Library.Library__ProductAlreadyBought.selector);
         store.buyProduct(i, price, deadline, v, r, s);
     }
 
@@ -253,7 +253,7 @@ contract TechnoStoreTest is Test {
         vm.stopPrank();
 
         vm.startPrank(customer);
-        vm.expectRevert("Library__ProductNotBought");
+        vm.expectRevert(Library.Library__ProductNotBought.selector);
 
         store.refundProduct(0);
     }
@@ -293,7 +293,7 @@ contract TechnoStoreTest is Test {
 
         vm.roll(blockNumber + 101);
         console2.logUint(block.number);
-        vm.expectRevert("Library__RefundExpired");
+        vm.expectRevert(Library.Library__RefundExpired.selector);
         store.refundProduct(i);
     }
 

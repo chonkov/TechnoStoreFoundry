@@ -20,6 +20,12 @@ interface IERC20P is IERC20, IERC20Permit {
  * @notice The library implements all methods underneath the `TechnoStore` contract
  */
 library Library {
+    error Library__InvalidInputs();
+    error Library__InsufficientAmount();
+    error Library__ProductAlreadyBought();
+    error Library__ProductNotBought();
+    error Library__RefundExpired();
+
     struct Product {
         mapping(string => uint) quantityOfProduct;
         mapping(string => uint) priceOf;
@@ -46,7 +52,7 @@ library Library {
         uint price
     ) public {
         if (price == 0 || amount == 0) {
-            revert("Library__InvalidInputs");
+            revert Library__InvalidInputs();
         }
 
         if (
@@ -86,12 +92,12 @@ library Library {
         bytes32 s
     ) public {
         if (product.quantityOfProduct[_product] == 0) {
-            revert("Library__InsufficientAmount");
+            revert Library__InsufficientAmount();
         }
 
         // Check if this customer(msg.sender/tx.origin) has already bought it
         if (product.boughtAt[_product][_customer] > 0) {
-            revert("Library__ProductAlreadyBought");
+            revert Library__ProductAlreadyBought();
         }
 
         product.quantityOfProduct[_product] -= 1;
@@ -126,10 +132,10 @@ library Library {
     ) public {
         // The block.number can be checked and if it is == 0 - revert
         if (product.boughtAt[_product][_customer] == 0) {
-            revert("Library__ProductNotBought");
+            revert Library__ProductNotBought();
         }
         if (block.number - product.boughtAt[_product][_customer] > 100) {
-            revert("Library__RefundExpired");
+            revert Library__RefundExpired();
         }
 
         product.quantityOfProduct[_product] += 1;
